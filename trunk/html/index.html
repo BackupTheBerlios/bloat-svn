@@ -1,0 +1,246 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+<HEAD>
+<META http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+<TITLE>Source code bloat</TITLE>
+<STYLE type="text/css">
+	H1 { text-align: center }
+	H2 { text-align: center }
+	PRE { margin-left: 5%; margin-right: 5%; background: #CCCCCC }
+	PRE.sub { margin-left: 10%; margin-right: 10%; background: #CCCCCC }
+</STYLE>
+</HEAD>
+<BODY>
+
+<H1>Source code bloat</H1>
+
+<H2>GNU true(1)</H2>
+
+<P><TT>Revision 1.25 Mon Jul 18 07:53:05 2005 UTC</TT>. Summary: 82 lines, 2287
+bytes of raw bloat.
+<PRE>
+     1	/* Exit with a status code indicating success.
+</PRE>
+<P>Well, yes. The very first comment in a file should say what the file is for.
+Unless code in it is trivial. Given that GNU people somehow made
+<TT>true(1)</TT> a not exactly trivial program, this comment should definitely
+stay.
+<PRE>
+     2	   Copyright (C) 1999-2003, 2005 Free Software Foundation, Inc.
+</PRE>
+<P>Comment Re: line 1 applies. Unbloated <TT>true(1)</TT> is not copyrightable,
+this one certainly is.
+<PRE>
+     3	
+     4	   This program is free software; you can redistribute it and/or modify
+     5	   it under the terms of the GNU General Public License as published by
+     6	   the Free Software Foundation; either version 2, or (at your option)
+     7	   any later version.
+     8	
+     9	   This program is distributed in the hope that it will be useful,
+    10	   but WITHOUT ANY WARRANTY; without even the implied warranty of
+    11	   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    12	   GNU General Public License for more details.
+    13	
+    14	   You should have received a copy of the GNU General Public License
+    15	   along with this program; if not, write to the Free Software Foundation,
+    16	   Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.  */
+</PRE>
+<P>Legalese. I wonder if somebody couldn't find a copy of GNU GPL and actually
+wrote to FSF. Even out of curiosity.
+<PRE>
+    17	
+    18	#include &lt;config.h&gt;
+    19	#include &lt;stdio.h&gt;
+    20	#include &lt;sys/types.h&gt;
+    21	#include "system.h"
+    22	
+    23	/* Act like "true" by default; false.c overrides this.  */
+</PRE>
+<P>Aha! This means comment at line 1 is partly incorrect.
+<PRE>
+    24	#ifndef EXIT_STATUS
+    25	# define EXIT_STATUS EXIT_SUCCESS
+    26	#endif
+</PRE>
+<P>What a nice idea of code reuse. Reuse because GNU <TT>false(1)</TT> can be
+made just a
+<PRE class="sub">
+	#define EXIT_STATUS EXIT_FAILURE
+	#include "true.c"
+</PRE>
+<P>Indeed, having another 2.2K of code which literally does <TT>return 1;</TT>
+isn't kosher, so lets abuse C preprocessor.
+<PRE>
+    27	
+    28	#if EXIT_STATUS == EXIT_SUCCESS
+    29	# define PROGRAM_NAME "true"
+    30	#else
+    31	# define PROGRAM_NAME "false"
+    32	#endif
+</PRE>
+<P>Consequences of <TT>EXIT_STATUS</TT> existence coupled with preprocessor
+abuse.
+<PRE>
+    33	
+    34	#define AUTHORS "Jim Meyering"
+</PRE>
+<P>Macro that is used only once. Since it's not a magic constant from hardware
+spec or something similar, it has no right for existence.
+
+<P>Oh, and we have somebody who isn't ashamed to put his name under this bloat.
+<PRE>
+    35	
+    36	/* The name this program was run with. */
+    37	char *program_name;
+</PRE>
+<P><TT>static char *</TT> at first glance. At second one, why can't
+<TT>usage()</TT> take two aguments?
+<PRE class="sub">
+	void usage(char *program_name, int status);
+</PRE>
+Its only call transforms to <TT>usage(argv[0], EXIT_STATUS);</TT> making
+comment at line 36 pretty obvious and thus subject for removal.
+<PRE>
+    38	
+    39	void
+    40	usage (int status)
+    41	{
+    42	  printf (_("\
+</PRE>
+<P>Joys of internationalization. Funny macro and ...
+<PRE>
+    43	Usage: %s [ignored command line arguments]\n\
+</PRE>
+<P>Damn right. Ignored command line arguments. <A
+href="http://www.opengroup.org/onlinepubs/7990989775/xcu/true.html">According
+to Single Unix Specification, version 2</A>, <TT>true(1)</TT> should ignore
+everything. Failure to do so is a bug, because it can be used for substituting
+out other commands in scripts, Makefiles, etc.
+
+<P>Now one can argue that a) GNU is not Unix, b) <TT>true(1)</TT> is part of
+GNU coreutils package, so why should it be SuS compliant? Indeed, why should
+program A be compliant with standard B? The fair answer is "Of course, it
+shouldn't... Unless authors of A want to make it compatible with the rest of
+the world who <EM>is</EM> compliant with B".
+<PRE>
+    44	  or:  %s OPTION\n\
+    45	"),
+</PRE>
+... apparent inability to format strings the way you want, not the way your
+tools dictate you.
+<PRE>
+    46		  program_name, program_name);
+    47	  printf ("%s\n\n",
+    48		  _(EXIT_STATUS == EXIT_SUCCESS
+    49		    ? "Exit with a status code indicating success."
+    50		    : "Exit with a status code indicating failure."));
+</PRE>
+<P>Probably should be rewritten as
+<PRE class="sub">
+ 	printf("Exit with a status code indicating %s.\n\n",
+	       _(EXIT_STATUS == EXIT_SUCCESS ? "success" : "failure"));
+</PRE>
+to save some space. But, heh, now internationalization tools tell you what to
+do.
+<PRE>
+    51	  fputs (HELP_OPTION_DESCRIPTION, stdout);
+    52	  fputs (VERSION_OPTION_DESCRIPTION, stdout);
+    53	  printf (USAGE_BUILTIN_WARNING, PROGRAM_NAME);
+</PRE>
+<P>Consequences of not being SuS compliant.
+<PRE>
+    54	  printf (_("\nReport bugs to &lt;%s&gt;.\n"), PACKAGE_BUGREPORT);
+</PRE>
+<P>What do you mean by "Report bugs to "? Isn't <TT>true(1)</TT> supposed to be
+cast in stone and declared second program in history that has zero bugs (with
+TeX being the first, of course)?
+
+<P>It's ironic that GNU <TT>false(1)</TT> <A
+href="http://marc.theaimsgroup.com/?l=linux-kernel&amp;m=92257606908169&amp;w=2">
+<EM>had</EM></A> a bug. <TT>false --help</TT> was OK, <TT>false --version</TT>
+was OK, but <TT>false --help --version</TT> was not.
+<PRE>
+    55	  exit (status);
+    56	}
+    57	
+    58	int
+    59	main (int argc, char **argv)
+    60	{
+    61	  initialize_main (&amp;argc, &amp;argv);
+    62	  program_name = argv[0];
+</PRE>
+<P>Consequences of not being SuS compliant.
+<PRE>
+    63	  setlocale (LC_ALL, "");
+    64	  bindtextdomain (PACKAGE, LOCALEDIR);
+    65	  textdomain (PACKAGE);
+</PRE>
+<P>Joys of internationalization.
+<PRE>
+    66	
+    67	  atexit (close_stdout);
+    68	
+    69	  /* Recognize --help or --version only if it's the only command-line
+    70	     argument.  */
+    71	  if (argc == 2)
+    72	    {
+    73	      if (STREQ (argv[1], "--help"))
+    74		usage (EXIT_STATUS);
+    75	
+    76	      if (STREQ (argv[1], "--version"))
+    77		version_etc (stdout, PROGRAM_NAME, GNU_PACKAGE, VERSION, AUTHORS,
+    78			     (char *) NULL);
+    79	    }
+</PRE>
+<P>Consequences of not being SuS compliant.
+<PRE>
+    80	
+    81	  exit (EXIT_STATUS);
+</PRE>
+<P>The <EM>only</EM> line that should exist.
+<PRE>
+    82	}
+</PRE>
+
+<H2>Unbloated equivalents as shell scripts</H2>
+
+<P><TT>true.c</TT> (10 bytes)
+<PRE>
+#!/bin/sh
+
+</PRE>
+<P>You need final newline.
+
+<P><TT>false.c</TT> (16 bytes)
+<PRE>
+#!/bin/sh
+exit 1
+</PRE>
+
+<H2>Unbloated equivalents as C programs</H2>
+
+<P><TT>true.c</TT>
+<PRE>
+#include &lt;stdlib.h&gt;
+
+int main(void)
+{
+	exit(EXIT_SUCCESS);
+}
+</PRE>
+
+<TT>false.c</TT>
+<PRE>
+#include &lt;stdlib.h&gt;
+
+int main(void)
+{
+	exit(EXIT_FAILURE);
+}
+</PRE>
+<P>6 lines, 61 bytes each. That's all.
+
+<P><A href="http://developer.berlios.de/" title="BerliOS Developer"><IMG src="http://developer.berlios.de/bslogo.php?group_id=4552" width="124px" height="32px" border="0" alt="BerliOS Developer Logo"></A>
+</BODY>
+</HTML>
